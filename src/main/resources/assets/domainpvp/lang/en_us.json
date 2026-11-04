@@ -1,0 +1,18 @@
+{
+  "modmenu.nameTranslation.domainpvp": "PvP Domain",
+  "modmenu.descriptionTranslation.domainpvp": "Materialize temporary combat domains block by block for high-stakes 1v1 duels.",
+  "domainpvp.party.created": "§6[PvP Domain] §aParty created! You are the party leader.",
+  "domainpvp.party.disbanded": "§6[PvP Domain] §eThe party has been disbanded.",
+  "domainpvp.party.player_joined": "§6[PvP Domain] §a%s joined the party!",
+  "domainpvp.party.player_left": "§6[PvP Domain] §c%s left the party.",
+  "domainpvp.party.invite_sent": "§6[PvP Domain] §bInvitation sent to %s.",
+  "domainpvp.party.invite_received": "§6[PvP Domain] §b%s invited you to a PvP Domain duel! Type /domain accept %s or open the GUI.",
+  "domainpvp.party.full": "§6[PvP Domain] §cParty is full! Max 2 players.",
+  "domainpvp.match.arena_building": "§6[PvP Domain] §5The Domain is manifesting...",
+  "domainpvp.match.countdown": "§eDuel starting in %d...",
+  "domainpvp.match.fight": "§c§lFIGHT!",
+  "domainpvp.match.victory": "§6§lVICTORY! §r§aWinner: %s",
+  "domainpvp.match.defeat": "§c§lDEFEAT! §r§7Better luck next time.",
+  "domainpvp.match.cleanup": "§6[PvP Domain] §7The Domain has collapsed. Returning to your world."
+}
+

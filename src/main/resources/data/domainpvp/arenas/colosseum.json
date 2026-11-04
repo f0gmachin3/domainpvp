@@ -1,0 +1,86 @@
+{
+  "id": "domainpvp:colosseum",
+  "name": "Roman Colosseum",
+  "author": "DomainPvP",
+  "dimensions": {
+    "width": 41,
+    "length": 41,
+    "height": 14,
+    "radius": 20
+  },
+  "boundary": {
+    "radius": 21.0,
+    "height": 16.0
+  },
+  "spawns": [
+    {
+      "index": 0,
+      "x": 13.5,
+      "y": 1.0,
+      "z": 0.5,
+      "yaw": 90.0,
+      "pitch": 0.0
+    },
+    {
+      "index": 1,
+      "x": -12.5,
+      "y": 1.0,
+      "z": 0.5,
+      "yaw": -90.0,
+      "pitch": 0.0
+    }
+  ],
+  "palette": [
+    "minecraft:air",
+    "minecraft:stone_bricks",
+    "minecraft:mossy_stone_bricks",
+    "minecraft:cracked_stone_bricks",
+    "minecraft:chiseled_stone_bricks",
+    "minecraft:smooth_stone",
+    "minecraft:smooth_stone_slab[type=bottom]",
+    "minecraft:stone_brick_stairs[facing=north,half=bottom,shape=straight]",
+    "minecraft:stone_brick_stairs[facing=south,half=bottom,shape=straight]",
+    "minecraft:stone_brick_stairs[facing=east,half=bottom,shape=straight]",
+    "minecraft:stone_brick_stairs[facing=west,half=bottom,shape=straight]",
+    "minecraft:stone_brick_wall",
+    "minecraft:iron_bars",
+    "minecraft:lantern[hanging=false]",
+    "minecraft:soul_lantern[hanging=false]",
+    "minecraft:red_carpet",
+    "minecraft:blue_carpet",
+    "minecraft:gold_block"
+  ],
+  "layers": [
+    {
+      "name": "foundation",
+      "order": 0,
+      "description": "Sub-floor reinforcement and outer ring base"
+    },
+    {
+      "name": "outer_walls",
+      "order": 1,
+      "description": "Perimeter stone brick walls with arched viewports"
+    },
+    {
+      "name": "pillars_and_arches",
+      "order": 2,
+      "description": "Colosseum columns, keystones and wall sconces"
+    },
+    {
+      "name": "spectator_stands",
+      "order": 3,
+      "description": "Tiered spectator seating encircling the combat zone"
+    },
+    {
+      "name": "combat_floor",
+      "order": 4,
+      "description": "Level arena sand & smooth stone dueling pavement"
+    },
+    {
+      "name": "spawns",
+      "order": 5,
+      "description": "Gladiator spawn pedestals and boundary anchors"
+    }
+  ]
+}
+

@@ -1,0 +1,45 @@
+{
+  "arena": {
+    "constructionSpeedBlocksPerTick": 25,
+    "maxActiveArenas": 4,
+    "defaultArenaTemplate": "domainpvp:colosseum",
+    "arenaDimension": "minecraft:overworld",
+    "arenaOriginX": 5000,
+    "arenaOriginY": 150,
+    "arenaOriginZ": 5000,
+    "arenaSpacing": 500,
+    "boundaryRadius": 22.0,
+    "boundaryHeight": 18.0
+  },
+  "match": {
+    "countdownDurationSeconds": 5,
+    "matchTimeoutSeconds": 600,
+    "rematchVoteTimeoutSeconds": 30,
+    "preventThirdPartyInterference": true,
+    "disableBlockBreaking": true,
+    "disableBlockPlacing": true,
+    "disableUnauthorizedCommands": true,
+    "freezePlayersDuringCountdown": true
+  },
+  "loadouts": {
+    "allowCustomLoadouts": true,
+    "maxCustomLoadoutsPerPlayer": 5,
+    "enforceStrictValidation": true,
+    "allowedPresets": [
+      "CLASSIC",
+      "SWORD",
+      "AXE",
+      "ARCHER",
+      "UHC",
+      "CUSTOM"
+    ]
+  },
+  "effects": {
+    "circularBoundaryParticles": true,
+    "constructionParticles": true,
+    "countdownSounds": true,
+    "domainCollapseAnimation": true,
+    "particleDensity": 1.0
+  }
+}
+
