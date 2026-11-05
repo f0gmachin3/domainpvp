@@ -33,14 +33,19 @@ public class CombatManager {
             return attackerMatch == null;
         }
 
-        // If victim is in a match, attacker MUST be their designated opponent
-        if (attackerMatch == null || !victimMatch.getMatchId().equals(attackerMatch.getMatchId())) {
-            return false; // Third-party interference blocked
-        }
-
         // Both players are in the same match: combat must be active
         if (victimMatch.getState() != MatchState.FIGHTING) {
             return false; // Pre-fight or post-fight immunity
+        }
+
+        // Environmental or fall damage (no attacker) is allowed during active fight
+        if (attackerUuid == null) {
+            return true;
+        }
+
+        // If victim is in a match, attacker MUST be their designated opponent
+        if (attackerMatch == null || !victimMatch.getMatchId().equals(attackerMatch.getMatchId())) {
+            return false; // Third-party interference blocked
         }
 
         // Record combat statistics

@@ -38,6 +38,18 @@ public class DomainPvPMod implements ModInitializer {
             return true;
         });
 
+        // Intercept lethal damage to handle match finish cleanly without vanilla death screen
+        ServerLivingEntityEvents.ALLOW_DEATH.register((entity, damageSource, damageAmount) -> {
+            if (entity instanceof ServerPlayerEntity victim) {
+                com.domainpvp.match.MatchSession match = com.domainpvp.match.MatchManager.getInstance().getMatchByPlayer(victim.getUuid());
+                if (match != null && match.getState() == com.domainpvp.match.MatchState.FIGHTING) {
+                    com.domainpvp.server.ServerMatchController.handlePlayerDeathInDuel(victim, match);
+                    return false;
+                }
+            }
+            return true;
+        });
+
         // Enforce arena block breaking protection via Fabric API events
         PlayerBlockBreakEvents.BEFORE.register((world, player, pos, state, blockEntity) -> {
             return CombatManager.getInstance().canBreakBlock(player.getUuid());

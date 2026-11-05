@@ -20,6 +20,7 @@ public class MatchSession {
     private final Map<UUID, Boolean> rematchVotes = new ConcurrentHashMap<>();
 
     private int countdownSeconds = 5;
+    private int finishCountdownTicks = 100; // 5 seconds post-match celebration
     private Instant startTime;
     private Instant finishTime;
 
@@ -88,6 +89,18 @@ public class MatchSession {
 
     public int decrementCountdown() {
         return --countdownSeconds;
+    }
+
+    public int getFinishCountdownTicks() {
+        return finishCountdownTicks;
+    }
+
+    public void setFinishCountdownTicks(int ticks) {
+        this.finishCountdownTicks = ticks;
+    }
+
+    public int decrementFinishCountdownTicks() {
+        return --finishCountdownTicks;
     }
 
     public void voteRematch(UUID playerUuid, boolean agree) {
