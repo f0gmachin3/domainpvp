@@ -1,18 +1,15 @@
 package com.domainpvp.loadout;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
- * Predefined competitive PvP presets.
+ * Predefined competitive PvP presets corresponding to the 6 official Domain kits.
  */
 public enum LoadoutPreset {
-    CLASSIC("Classic PvP", "Standard 1.8/1.9 balanced diamond gear with golden apples"),
-    SWORD("Sword PvP", "Netherite sword dual with shield and splash potions"),
-    AXE("Axe PvP", "Shield-disabling axe combat with high burst damage"),
-    ARCHER("Archer PvP", "Ranged bow duel with mobility enhancement"),
-    UHC("UHC PvP", "Ultra Hardcore equipment: water buckets, rods, and golden apples"),
-    CUSTOM("Custom Loadout", "Player-tailored combat kit validated server-side");
+    SWORD_PVP("Sword PvP", "Diamond armor, sword, rod, golden apples, pearls, steak"),
+    AXE_PVP("Axe PvP", "Diamond armor, axe, sword, shield, bow, arrows, apples, steak"),
+    UHC_PVP("UHC PvP", "Diamond armor, sword, axe, bow, arrows, water, lava, cobwebs, planks, rod, steak"),
+    SMP_PVP("SMP / Netherite PvP", "Netherite armor & weapons, shield, totem, pearls, apples, god apples, xp, steak"),
+    MACE_PVP("Mace PvP", "Netherite armor, mace, wind charges, pearls, shield, totem, apples, rockets, water"),
+    POT_PVP("Pot PvP", "Diamond armor, sword, 36 Splash Healing II potions, pearls, golden carrots");
 
     private final String displayName;
     private final String description;
@@ -33,87 +30,112 @@ public enum LoadoutPreset {
     public static Loadout createDefault(LoadoutPreset preset) {
         Loadout loadout = new Loadout(preset.name());
         switch (preset) {
-            case CLASSIC -> {
-                loadout.setHelmet(LoadoutItem.enchanted("minecraft:diamond_helmet", 1, "minecraft:protection", 2));
-                loadout.setChestplate(LoadoutItem.enchanted("minecraft:diamond_chestplate", 1, "minecraft:protection", 2));
-                loadout.setLeggings(LoadoutItem.enchanted("minecraft:diamond_leggings", 1, "minecraft:protection", 2));
-                loadout.setBoots(LoadoutItem.enchanted("minecraft:diamond_boots", 1, "minecraft:protection", 2));
+            case SWORD_PVP -> {
+                // Armor: Diamond Set
+                loadout.setHelmet(LoadoutItem.simple("minecraft:diamond_helmet", 1));
+                loadout.setChestplate(LoadoutItem.simple("minecraft:diamond_chestplate", 1));
+                loadout.setLeggings(LoadoutItem.simple("minecraft:diamond_leggings", 1));
+                loadout.setBoots(LoadoutItem.simple("minecraft:diamond_boots", 1));
+
+                // Inventory: Diamond Sword x1, Fishing Rod x1, Golden Apples x8, Ender Pearls x16, Steak x64
+                loadout.setHotbarSlot(0, LoadoutItem.simple("minecraft:diamond_sword", 1));
+                loadout.setHotbarSlot(1, LoadoutItem.simple("minecraft:fishing_rod", 1));
+                loadout.setHotbarSlot(2, LoadoutItem.simple("minecraft:golden_apple", 8));
+                loadout.setHotbarSlot(3, LoadoutItem.simple("minecraft:ender_pearl", 16));
+                loadout.setHotbarSlot(4, LoadoutItem.simple("minecraft:cooked_beef", 64));
+            }
+            case AXE_PVP -> {
+                // Armor: Diamond Set
+                loadout.setHelmet(LoadoutItem.simple("minecraft:diamond_helmet", 1));
+                loadout.setChestplate(LoadoutItem.simple("minecraft:diamond_chestplate", 1));
+                loadout.setLeggings(LoadoutItem.simple("minecraft:diamond_leggings", 1));
+                loadout.setBoots(LoadoutItem.simple("minecraft:diamond_boots", 1));
                 loadout.setOffhand(LoadoutItem.simple("minecraft:shield", 1));
 
-                loadout.setHotbarSlot(0, LoadoutItem.enchanted("minecraft:diamond_sword", 1, "minecraft:sharpness", 3));
-                loadout.setHotbarSlot(1, LoadoutItem.simple("minecraft:golden_apple", 16));
-                loadout.setHotbarSlot(2, LoadoutItem.enchanted("minecraft:bow", 1, "minecraft:power", 3));
-                loadout.setHotbarSlot(3, LoadoutItem.simple("minecraft:cooked_beef", 64));
-                loadout.setHotbarSlot(4, LoadoutItem.simple("minecraft:water_bucket", 1));
-                loadout.setInventorySlot(0, LoadoutItem.simple("minecraft:arrow", 64));
-            }
-            case SWORD -> {
-                loadout.setHelmet(LoadoutItem.enchanted("minecraft:netherite_helmet", 1, "minecraft:protection", 3));
-                loadout.setChestplate(LoadoutItem.enchanted("minecraft:netherite_chestplate", 1, "minecraft:protection", 3));
-                loadout.setLeggings(LoadoutItem.enchanted("minecraft:netherite_leggings", 1, "minecraft:protection", 3));
-                loadout.setBoots(LoadoutItem.enchanted("minecraft:netherite_boots", 1, "minecraft:protection", 3));
-                loadout.setOffhand(LoadoutItem.simple("minecraft:shield", 1));
-
-                loadout.setHotbarSlot(0, LoadoutItem.enchanted("minecraft:netherite_sword", 1, "minecraft:sharpness", 4));
-                loadout.setHotbarSlot(1, LoadoutItem.simple("minecraft:golden_apple", 8));
-                loadout.setHotbarSlot(2, LoadoutItem.simple("minecraft:splash_potion", 2)); // Healing II
-                loadout.setHotbarSlot(3, LoadoutItem.simple("minecraft:potion", 1)); // Speed II
-                loadout.setHotbarSlot(4, LoadoutItem.simple("minecraft:cooked_beef", 32));
-            }
-            case AXE -> {
-                loadout.setHelmet(LoadoutItem.enchanted("minecraft:diamond_helmet", 1, "minecraft:protection", 2));
-                loadout.setChestplate(LoadoutItem.enchanted("minecraft:diamond_chestplate", 1, "minecraft:protection", 2));
-                loadout.setLeggings(LoadoutItem.enchanted("minecraft:diamond_leggings", 1, "minecraft:protection", 2));
-                loadout.setBoots(LoadoutItem.enchanted("minecraft:diamond_boots", 1, "minecraft:protection", 2));
-                loadout.setOffhand(LoadoutItem.enchanted("minecraft:shield", 1, "minecraft:unbreaking", 3));
-
-                loadout.setHotbarSlot(0, LoadoutItem.enchanted("minecraft:diamond_axe", 1, "minecraft:sharpness", 4));
-                loadout.setHotbarSlot(1, LoadoutItem.simple("minecraft:crossbow", 1));
-                loadout.setHotbarSlot(2, LoadoutItem.simple("minecraft:cooked_porkchop", 32));
-                loadout.setHotbarSlot(3, LoadoutItem.simple("minecraft:golden_apple", 4));
-                loadout.setInventorySlot(0, LoadoutItem.simple("minecraft:arrow", 32));
-            }
-            case ARCHER -> {
-                loadout.setHelmet(LoadoutItem.enchanted("minecraft:chainmail_helmet", 1, "minecraft:protection", 1));
-                loadout.setChestplate(LoadoutItem.enchanted("minecraft:chainmail_chestplate", 1, "minecraft:protection", 1));
-                loadout.setLeggings(LoadoutItem.enchanted("minecraft:chainmail_leggings", 1, "minecraft:protection", 1));
-                loadout.setBoots(LoadoutItem.enchanted("minecraft:chainmail_boots", 1, "minecraft:protection", 1));
-
-                Map<String, Integer> bowEnchs = new HashMap<>();
-                bowEnchs.put("minecraft:power", 4);
-                bowEnchs.put("minecraft:flame", 1);
-                bowEnchs.put("minecraft:infinity", 1);
-
-                loadout.setHotbarSlot(0, new LoadoutItem("minecraft:bow", 1, bowEnchs));
-                loadout.setHotbarSlot(1, LoadoutItem.simple("minecraft:iron_sword", 1));
-                loadout.setHotbarSlot(2, LoadoutItem.simple("minecraft:cooked_beef", 32));
-                loadout.setHotbarSlot(3, LoadoutItem.simple("minecraft:golden_apple", 4));
-                loadout.setInventorySlot(0, LoadoutItem.simple("minecraft:arrow", 1));
-            }
-            case UHC -> {
-                loadout.setHelmet(LoadoutItem.enchanted("minecraft:iron_helmet", 1, "minecraft:protection", 2));
-                loadout.setChestplate(LoadoutItem.enchanted("minecraft:iron_chestplate", 1, "minecraft:protection", 2));
-                loadout.setLeggings(LoadoutItem.enchanted("minecraft:iron_leggings", 1, "minecraft:protection", 2));
-                loadout.setBoots(LoadoutItem.enchanted("minecraft:iron_boots", 1, "minecraft:protection", 2));
-                loadout.setOffhand(LoadoutItem.simple("minecraft:shield", 1));
-
-                loadout.setHotbarSlot(0, LoadoutItem.enchanted("minecraft:iron_sword", 1, "minecraft:sharpness", 2));
-                loadout.setHotbarSlot(1, LoadoutItem.simple("minecraft:iron_axe", 1));
+                // Inventory: Diamond Axe x1, Diamond Sword x1, Shield x1, Bow x1, Arrows x32, Golden Apples x8, Steak x32
+                loadout.setHotbarSlot(0, LoadoutItem.simple("minecraft:diamond_axe", 1));
+                loadout.setHotbarSlot(1, LoadoutItem.simple("minecraft:diamond_sword", 1));
                 loadout.setHotbarSlot(2, LoadoutItem.simple("minecraft:bow", 1));
-                loadout.setHotbarSlot(3, LoadoutItem.simple("minecraft:water_bucket", 1));
-                loadout.setHotbarSlot(4, LoadoutItem.simple("minecraft:lava_bucket", 1));
-                loadout.setHotbarSlot(5, LoadoutItem.simple("minecraft:golden_apple", 6));
-                loadout.setHotbarSlot(6, LoadoutItem.simple("minecraft:fishing_rod", 1));
-                loadout.setHotbarSlot(7, LoadoutItem.simple("minecraft:cobblestone", 64));
-                loadout.setHotbarSlot(8, LoadoutItem.simple("minecraft:cooked_beef", 32));
+                loadout.setHotbarSlot(3, LoadoutItem.simple("minecraft:golden_apple", 8));
+                loadout.setHotbarSlot(4, LoadoutItem.simple("minecraft:cooked_beef", 32));
                 loadout.setInventorySlot(0, LoadoutItem.simple("minecraft:arrow", 32));
             }
-            case CUSTOM -> {
-                // Starts empty or copy of Classic
-                return createDefault(CLASSIC);
+            case UHC_PVP -> {
+                // Armor: Diamond Set
+                loadout.setHelmet(LoadoutItem.simple("minecraft:diamond_helmet", 1));
+                loadout.setChestplate(LoadoutItem.simple("minecraft:diamond_chestplate", 1));
+                loadout.setLeggings(LoadoutItem.simple("minecraft:diamond_leggings", 1));
+                loadout.setBoots(LoadoutItem.simple("minecraft:diamond_boots", 1));
+
+                // Inventory: Diamond Sword x1, Diamond Axe x1, Bow x1, Arrows x32, Water Bucket x1, Lava Bucket x1, Golden Apples x8, Cobwebs x8, Oak Planks x64, Fishing Rod x1, Steak x32
+                loadout.setHotbarSlot(0, LoadoutItem.simple("minecraft:diamond_sword", 1));
+                loadout.setHotbarSlot(1, LoadoutItem.simple("minecraft:diamond_axe", 1));
+                loadout.setHotbarSlot(2, LoadoutItem.simple("minecraft:bow", 1));
+                loadout.setHotbarSlot(3, LoadoutItem.simple("minecraft:fishing_rod", 1));
+                loadout.setHotbarSlot(4, LoadoutItem.simple("minecraft:golden_apple", 8));
+                loadout.setHotbarSlot(5, LoadoutItem.simple("minecraft:water_bucket", 1));
+                loadout.setHotbarSlot(6, LoadoutItem.simple("minecraft:lava_bucket", 1));
+                loadout.setHotbarSlot(7, LoadoutItem.simple("minecraft:cobweb", 8));
+                loadout.setHotbarSlot(8, LoadoutItem.simple("minecraft:oak_planks", 64));
+                loadout.setInventorySlot(0, LoadoutItem.simple("minecraft:arrow", 32));
+                loadout.setInventorySlot(1, LoadoutItem.simple("minecraft:cooked_beef", 32));
+            }
+            case SMP_PVP -> {
+                // Armor: Netherite Set
+                loadout.setHelmet(LoadoutItem.simple("minecraft:netherite_helmet", 1));
+                loadout.setChestplate(LoadoutItem.simple("minecraft:netherite_chestplate", 1));
+                loadout.setLeggings(LoadoutItem.simple("minecraft:netherite_leggings", 1));
+                loadout.setBoots(LoadoutItem.simple("minecraft:netherite_boots", 1));
+                loadout.setOffhand(LoadoutItem.simple("minecraft:totem_of_undying", 1));
+
+                // Inventory: Netherite Sword x1, Netherite Axe x1, Shield x1, Totem of Undying x1, Ender Pearls x16, Golden Apples x16, Enchanted Golden Apples x4, Experience Bottles x64, Steak x32
+                loadout.setHotbarSlot(0, LoadoutItem.simple("minecraft:netherite_sword", 1));
+                loadout.setHotbarSlot(1, LoadoutItem.simple("minecraft:netherite_axe", 1));
+                loadout.setHotbarSlot(2, LoadoutItem.simple("minecraft:shield", 1));
+                loadout.setHotbarSlot(3, LoadoutItem.simple("minecraft:golden_apple", 16));
+                loadout.setHotbarSlot(4, LoadoutItem.simple("minecraft:enchanted_golden_apple", 4));
+                loadout.setHotbarSlot(5, LoadoutItem.simple("minecraft:ender_pearl", 16));
+                loadout.setHotbarSlot(6, LoadoutItem.simple("minecraft:cooked_beef", 32));
+                loadout.setHotbarSlot(7, LoadoutItem.simple("minecraft:experience_bottle", 64));
+            }
+            case MACE_PVP -> {
+                // Armor: Netherite Set
+                loadout.setHelmet(LoadoutItem.simple("minecraft:netherite_helmet", 1));
+                loadout.setChestplate(LoadoutItem.simple("minecraft:netherite_chestplate", 1));
+                loadout.setLeggings(LoadoutItem.simple("minecraft:netherite_leggings", 1));
+                loadout.setBoots(LoadoutItem.simple("minecraft:netherite_boots", 1));
+                loadout.setOffhand(LoadoutItem.simple("minecraft:shield", 1));
+
+                // Inventory: Mace x1, Wind Charges x32, Ender Pearls x16, Shield x1, Totem of Undying x1, Golden Apples x16, Firework Rockets x64, Water Bucket x1
+                loadout.setHotbarSlot(0, LoadoutItem.simple("minecraft:mace", 1));
+                loadout.setHotbarSlot(1, LoadoutItem.simple("minecraft:wind_charge", 32));
+                loadout.setHotbarSlot(2, LoadoutItem.simple("minecraft:ender_pearl", 16));
+                loadout.setHotbarSlot(3, LoadoutItem.simple("minecraft:totem_of_undying", 1));
+                loadout.setHotbarSlot(4, LoadoutItem.simple("minecraft:golden_apple", 16));
+                loadout.setHotbarSlot(5, LoadoutItem.simple("minecraft:firework_rocket", 64));
+                loadout.setHotbarSlot(6, LoadoutItem.simple("minecraft:water_bucket", 1));
+            }
+            case POT_PVP -> {
+                // Armor: Diamond Set
+                loadout.setHelmet(LoadoutItem.simple("minecraft:diamond_helmet", 1));
+                loadout.setChestplate(LoadoutItem.simple("minecraft:diamond_chestplate", 1));
+                loadout.setLeggings(LoadoutItem.simple("minecraft:diamond_leggings", 1));
+                loadout.setBoots(LoadoutItem.simple("minecraft:diamond_boots", 1));
+                loadout.setOffhand(LoadoutItem.simple("minecraft:splash_potion", 1));
+
+                // Inventory: Diamond Sword x1, Splash Potion of Healing II x36, Ender Pearls x16, Golden Carrots x64
+                loadout.setHotbarSlot(0, LoadoutItem.simple("minecraft:diamond_sword", 1));
+                loadout.setHotbarSlot(1, LoadoutItem.simple("minecraft:ender_pearl", 16));
+                loadout.setHotbarSlot(2, LoadoutItem.simple("minecraft:golden_carrot", 64));
+                for (int h = 3; h < 9; h++) {
+                    loadout.setHotbarSlot(h, LoadoutItem.simple("minecraft:splash_potion", 1));
+                }
+                for (int inv = 0; inv < 27; inv++) {
+                    loadout.setInventorySlot(inv, LoadoutItem.simple("minecraft:splash_potion", 1));
+                }
+                // (1 offhand + 6 hotbar + 27 main inv + 2 additional in inventory slots 25, 26 = 36 total)
             }
         }
         return loadout;
     }
 }
-

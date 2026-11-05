@@ -65,14 +65,26 @@ public class ClientNetworkHandler {
             });
         });
 
+        ClientPlayNetworking.registerGlobalReceiver(OpenKitSelectionPayload.ID, (payload, context) -> {
+            context.client().execute(() -> {
+                context.client().setScreen(new com.domainpvp.client.ui.KitSelectionScreen());
+            });
+        });
+
         ClientPlayNetworking.registerGlobalReceiver(CountdownUpdatedPayload.ID, (payload, context) -> {
             context.client().execute(() -> {
+                if (context.client().currentScreen instanceof com.domainpvp.client.ui.KitSelectionScreen) {
+                    context.client().setScreen(null);
+                }
                 ClientUIManager.getInstance().setCountdown(payload.remainingSeconds());
             });
         });
 
         ClientPlayNetworking.registerGlobalReceiver(MatchStartedPayload.ID, (payload, context) -> {
             context.client().execute(() -> {
+                if (context.client().currentScreen instanceof com.domainpvp.client.ui.KitSelectionScreen) {
+                    context.client().setScreen(null);
+                }
                 ClientUIManager.getInstance().setCombatActive(true);
             });
         });

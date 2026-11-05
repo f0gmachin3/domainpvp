@@ -22,16 +22,25 @@ import com.domainpvp.player.PlayerStateManager;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
+import net.minecraft.component.type.PotionContentsComponent;
 import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 import net.minecraft.network.packet.s2c.play.SubtitleS2CPacket;
 import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
 import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
 import net.minecraft.particle.ParticleTypes;
+import net.minecraft.potion.Potions;
 import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.scoreboard.Scoreboard;
+import net.minecraft.scoreboard.ScoreboardCriterion;
+import net.minecraft.scoreboard.ScoreboardDisplaySlot;
+import net.minecraft.scoreboard.ScoreboardObjective;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -46,14 +55,40 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Authoritative controller coordinating match lifecycle ticks, arena manifestation,
- * synchronized countdowns, combat isolation, and reliable rollback.
+ * Authoritative controller coordinating Best of 3 (Bo3) matches, 6-kit voting,
+ * arena manifestation, boundary security, pre-match inventory rollback, and fireworks celebrations.
  */
 public class ServerMatchController {
     private static int tickCounter = 0;
 
+    /**
+     * Initializes vanilla scoreboard objective so hearts are displayed over players' heads.
+     */
+    public static void initializeHealthScoreboard(MinecraftServer server) {
+        try {
+            Scoreboard scoreboard = server.getScoreboard();
+            ScoreboardObjective obj = scoreboard.getNullableObjective("pvp_hearts");
+            if (obj == null) {
+                obj = scoreboard.addObjective(
+                        "pvp_hearts",
+                        ScoreboardCriterion.HEALTH,
+                        Text.literal("§c❤"),
+                        ScoreboardCriterion.RenderType.INTEGER,
+                        true,
+                        null
+                );
+            }
+            scoreboard.setObjectiveSlot(ScoreboardDisplaySlot.BELOW_NAME, obj);
+        } catch (Exception e) {
+            System.err.println("[PvP Domain] Failed to initialize health display: " + e.getMessage());
+        }
+    }
+
     public static void startDuelMatch(MinecraftServer server, Party party, ServerPlayerEntity p1, ServerPlayerEntity p2) {
-        // 1. Capture snapshots of both players before entering domain
+        // 0. Ensure health scoreboard is active
+        initializeHealthScoreboard(server);
+
+        // 1. Capture complete snapshots (including inventories) before entering domain
         capturePlayerSnapshot(p1);
         capturePlayerSnapshot(p2);
 
@@ -64,6 +99,7 @@ public class ServerMatchController {
         MatchSession match = MatchManager.getInstance().createMatch(party.getId(), p1.getUuid(), p2.getUuid());
         match.setArenaInstanceId(arena.getInstanceId());
         match.getStateMachine().forceState(MatchState.ARENA_BUILDING);
+        match.setKitVotingTicks(140); // 7s for kit voting while arena manifests
 
         // 4. Force load chunks around the arena to ensure block placement succeeds
         ServerWorld world = server.getOverworld();
@@ -99,8 +135,32 @@ public class ServerMatchController {
         ServerPlayNetworking.send(p1, payload);
         ServerPlayNetworking.send(p2, payload);
 
-        p1.sendMessage(Text.translatable("domainpvp.match.arena_building"), false);
-        p2.sendMessage(Text.translatable("domainpvp.match.arena_building"), false);
+        // 7. Prompt both players with the 6-icon Kit Selection GUI
+        ServerPlayNetworking.send(p1, new OpenKitSelectionPayload(8));
+        ServerPlayNetworking.send(p2, new OpenKitSelectionPayload(8));
+
+        p1.sendMessage(Text.literal("§6§l[PvP Domain] §eSelect your PvP Kit! Click an icon on-screen or type §b/kit <1-6>§e."), false);
+        p2.sendMessage(Text.literal("§6§l[PvP Domain] §eSelect your PvP Kit! Click an icon on-screen or type §b/kit <1-6>§e."), false);
+    }
+
+    public static void resolveAndApplyKit(MinecraftServer server, MatchSession match) {
+        if (match == null) return;
+        String chosenKit = match.resolveKit();
+        match.setActiveKitName(chosenKit);
+
+        ServerPlayerEntity p1 = server.getPlayerManager().getPlayer(match.getPlayer1Uuid());
+        ServerPlayerEntity p2 = server.getPlayerManager().getPlayer(match.getPlayer2Uuid());
+
+        if (p1 != null) {
+            applyLoadout(p1, chosenKit);
+            p1.sendMessage(Text.literal("§6§l[PvP Domain] §aKit Selected: §e§l" + chosenKit + "§a!"), false);
+            p1.playSoundToPlayer(SoundEvents.BLOCK_NOTE_BLOCK_BELL.value(), SoundCategory.PLAYERS, 1.0f, 1.2f);
+        }
+        if (p2 != null) {
+            applyLoadout(p2, chosenKit);
+            p2.sendMessage(Text.literal("§6§l[PvP Domain] §aKit Selected: §e§l" + chosenKit + "§a!"), false);
+            p2.playSoundToPlayer(SoundEvents.BLOCK_NOTE_BLOCK_BELL.value(), SoundCategory.PLAYERS, 1.0f, 1.2f);
+        }
     }
 
     public static void tick(MinecraftServer server) {
@@ -113,9 +173,22 @@ public class ServerMatchController {
             ArenaInstance arena = ArenaManager.getInstance().getArena(match.getArenaInstanceId());
 
             if (p1 == null || p2 == null) {
-                // If a player disconnected, handle cleanup
                 MatchManager.getInstance().handlePlayerDisconnect(p1 == null ? match.getPlayer1Uuid() : match.getPlayer2Uuid());
                 continue;
+            }
+
+            // Handle inter-round transition countdown (e.g. 4 seconds between rounds in Bo3)
+            if (match.getRoundTransitionTicks() > 0) {
+                int rem = match.decrementRoundTransitionTicks();
+                if (rem % 20 == 0 && rem > 0) {
+                    int sec = rem / 20;
+                    p1.sendMessage(Text.literal("§e✦ Round " + (match.getCurrentRound() + 1) + " starting in " + sec + "s... ✦"), true);
+                    p2.sendMessage(Text.literal("§e✦ Round " + (match.getCurrentRound() + 1) + " starting in " + sec + "s... ✦"), true);
+                } else if (rem == 0) {
+                    match.nextRound();
+                    match.getStateMachine().forceState(MatchState.COUNTDOWN);
+                    match.setCountdownSeconds(3);
+                }
             }
 
             switch (match.getState()) {
@@ -125,7 +198,7 @@ public class ServerMatchController {
                         int speed = ModConfig.get().arena.constructionSpeedBlocksPerTick;
                         List<ArenaBlockEntry> placed = ArenaManager.getInstance().tickConstruction(arena, speed);
 
-                        // Strictly lock players in place on their spawn block during building
+                        // Keep players locked on spawn pedestals during building
                         lockPlayerToSpawn(p1, arena.getSpawn1World());
                         lockPlayerToSpawn(p2, arena.getSpawn2World());
 
@@ -148,35 +221,30 @@ public class ServerMatchController {
 
                         // Send progress action bar and payload
                         int pct = Math.min(100, (arena.getPlacedCount() * 100) / Math.max(1, arena.getTotalBlocks()));
-                        p1.sendMessage(Text.literal("§5✦ Manifesting Arena: §d" + pct + "% §5✦"), true);
-                        p2.sendMessage(Text.literal("§5✦ Manifesting Arena: §d" + pct + "% §5✦"), true);
+                        p1.sendMessage(Text.literal("§5✦ Manifesting Colosseum: §d" + pct + "% §5✦"), true);
+                        p2.sendMessage(Text.literal("§5✦ Manifesting Colosseum: §d" + pct + "% §5✦"), true);
 
                         ArenaConstructionProgressPayload prog = new ArenaConstructionProgressPayload(arena.getPlacedCount(), arena.getTotalBlocks());
                         ServerPlayNetworking.send(p1, prog);
                         ServerPlayNetworking.send(p2, prog);
 
+                        // Check kit voting timer
+                        int vTicks = match.decrementKitVotingTicks();
+                        if (match.haveBothVotedKit() || vTicks <= 0 || arena.getStatus() == ArenaInstance.Status.READY) {
+                            if (match.getKitVotingTicks() > -999) {
+                                resolveAndApplyKit(server, match);
+                                match.setKitVotingTicks(-1000); // mark kit resolved
+                            }
+                        }
+
                         if (arena.getStatus() == ArenaInstance.Status.READY || arena.getConstructionQueue().isEmpty()) {
                             // Arena construction complete!
                             match.getStateMachine().transitionTo(MatchState.COUNTDOWN);
-                            match.setCountdownSeconds(ModConfig.get().match.countdownDurationSeconds);
+                            match.setCountdownSeconds(3);
 
                             ArenaSpawnPoint sp1 = arena.getSpawn1World();
                             ArenaSpawnPoint sp2 = arena.getSpawn2World();
 
-                            // Apply validated loadouts
-                            Party party = PartyManager.getInstance().getPartyById(match.getPartyId());
-                            String l1 = "CLASSIC";
-                            String l2 = "CLASSIC";
-                            if (party != null) {
-                                PartyMember m1 = party.getMember(p1.getUuid());
-                                PartyMember m2 = party.getMember(p2.getUuid());
-                                if (m1 != null && m1.getSelectedLoadoutName() != null) l1 = m1.getSelectedLoadoutName();
-                                if (m2 != null && m2.getSelectedLoadoutName() != null) l2 = m2.getSelectedLoadoutName();
-                            }
-                            applyLoadout(p1, l1);
-                            applyLoadout(p2, l2);
-
-                            // Sound: Level up chime for arena completion!
                             BlockPos posSp1 = new BlockPos((int) Math.floor(sp1.x()), (int) Math.floor(sp1.y()), (int) Math.floor(sp1.z()));
                             BlockPos posSp2 = new BlockPos((int) Math.floor(sp2.x()), (int) Math.floor(sp2.y()), (int) Math.floor(sp2.z()));
                             world.playSound(null, posSp1, SoundEvents.ENTITY_PLAYER_LEVELUP, SoundCategory.PLAYERS, 1.0f, 1.2f);
@@ -191,7 +259,7 @@ public class ServerMatchController {
                     }
                 }
                 case COUNTDOWN -> {
-                    // Keep players locked on spawn pedestals during countdown
+                    // Lock players to spawn pedestals during countdown
                     if (arena != null) {
                         lockPlayerToSpawn(p1, arena.getSpawn1World());
                         lockPlayerToSpawn(p2, arena.getSpawn2World());
@@ -206,15 +274,14 @@ public class ServerMatchController {
                         if (remaining > 0) {
                             playCountdownSound(p1, remaining);
                             playCountdownSound(p2, remaining);
-                            p1.sendMessage(Text.translatable("domainpvp.match.countdown", remaining), true);
-                            p2.sendMessage(Text.translatable("domainpvp.match.countdown", remaining), true);
+                            p1.sendMessage(Text.literal("§e§lRound " + match.getCurrentRound() + " starting in §6§l" + remaining + "..."), true);
+                            p2.sendMessage(Text.literal("§e§lRound " + match.getCurrentRound() + " starting in §6§l" + remaining + "..."), true);
                             match.decrementCountdown();
                         } else {
                             // 0 = FIGHT!
                             match.getStateMachine().transitionTo(MatchState.FIGHTING);
                             match.setStartTime(java.time.Instant.now());
 
-                            // Release players from spawn lock
                             p1.clearStatusEffects();
                             p2.clearStatusEffects();
                             p1.setVelocity(0, 0, 0);
@@ -226,10 +293,9 @@ public class ServerMatchController {
 
                             playFightSound(p1);
                             playFightSound(p2);
-                            p1.sendMessage(Text.translatable("domainpvp.match.fight"), true);
-                            p2.sendMessage(Text.translatable("domainpvp.match.fight"), true);
+                            p1.sendMessage(Text.literal("§c§l[Round " + match.getCurrentRound() + "] FIGHT!"), true);
+                            p2.sendMessage(Text.literal("§c§l[Round " + match.getCurrentRound() + "] FIGHT!"), true);
 
-                            // Spawn fight start burst particles
                             if (arena != null) {
                                 ServerWorld world = server.getOverworld();
                                 world.spawnParticles(ParticleTypes.EXPLOSION, arena.getOriginX(), arena.getOriginY() + 2, arena.getOriginZ(), 2, 1.0, 0.5, 1.0, 0.1);
@@ -239,13 +305,13 @@ public class ServerMatchController {
                     }
                 }
                 case FIGHTING -> {
-                    // Boundary enforcement
+                    // Security boundary enforcement
                     if (arena != null) {
                         enforceBoundary(p1, arena);
                         enforceBoundary(p2, arena);
                     }
 
-                    // Fallback death check
+                    // Fallback health check
                     if (p1.getHealth() <= 0.0f || p1.isDead()) {
                         handlePlayerDeathInDuel(p1, match);
                     } else if (p2.getHealth() <= 0.0f || p2.isDead()) {
@@ -277,12 +343,18 @@ public class ServerMatchController {
         if (server == null) return;
 
         UUID winnerUuid = match.getOpponent(victim.getUuid());
-        UUID loserUuid = victim.getUuid();
-        MatchManager.getInstance().finishMatch(match.getMatchId(), winnerUuid, loserUuid);
-
         ServerPlayerEntity winner = server.getPlayerManager().getPlayer(winnerUuid);
+        ArenaInstance arena = ArenaManager.getInstance().getArena(match.getArenaInstanceId());
 
-        // Keep victim from dying into vanilla respawn screen
+        // 1. Record Best of 3 round win
+        match.recordRoundWin(winnerUuid);
+
+        // 2. Launch celebratory fireworks from all sides of the arena
+        if (arena != null) {
+            spawnRoundWinFireworks(server, arena);
+        }
+
+        // 3. Keep victim from dying into vanilla respawn screen
         victim.setHealth(20.0f);
         victim.clearStatusEffects();
         victim.addStatusEffect(new StatusEffectInstance(StatusEffects.RESISTANCE, 200, 255, false, false, false));
@@ -294,21 +366,84 @@ public class ServerMatchController {
 
         String winnerName = winner != null ? winner.getName().getString() : "Opponent";
         String victimName = victim.getName().getString();
+        int p1Score = match.getPlayer1Score();
+        int p2Score = match.getPlayer2Score();
+        String scoreText = "§eScore: " + p1Score + " - " + p2Score;
 
-        // Broadcast titles & chat messages
-        if (winner != null) {
-            winner.sendMessage(Text.literal("§6§l[PvP Domain] VICTORY! §aYou defeated " + victimName + "!"), false);
-            winner.playSoundToPlayer(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundCategory.PLAYERS, 1.0f, 1.0f);
-            sendTitle(winner, "§6§lVICTORY!", "§aYou won the duel! Domain collapsing in 5s...");
+        // 4. Check if Match is decided (Best of 3: first to 2 round wins)
+        if (match.isMatchDecided()) {
+            MatchManager.getInstance().finishMatch(match.getMatchId(), winnerUuid, victim.getUuid());
+
+            if (winner != null) {
+                winner.sendMessage(Text.literal("§6§l[PvP Domain] MATCH VICTORY! §aYou won the Best of 3 (" + scoreText + ")!"), false);
+                winner.playSoundToPlayer(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundCategory.PLAYERS, 1.2f, 1.0f);
+                sendTitle(winner, "§6§lMATCH VICTORY!", scoreText + " §7(Domain collapsing in 5s...)");
+            }
+
+            victim.sendMessage(Text.literal("§c§l[PvP Domain] MATCH DEFEAT! §7Better luck next time (" + scoreText + ")."), false);
+            victim.playSoundToPlayer(SoundEvents.ENTITY_WITHER_SPAWN, SoundCategory.PLAYERS, 0.8f, 1.0f);
+            sendTitle(victim, "§c§lMATCH DEFEAT!", scoreText + " §7(Domain collapsing in 5s...)");
+
+            broadcastMatchFinished(winner != null ? winner : victim, victim, match);
+            match.setFinishCountdownTicks(100); // 5s celebration before domain collapse
+        } else {
+            // Next Round in Best of 3!
+            int roundWon = match.getCurrentRound();
+            if (winner != null) {
+                winner.sendMessage(Text.literal("§6§l[PvP Domain] Round " + roundWon + " Won! " + scoreText), false);
+                winner.playSoundToPlayer(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundCategory.PLAYERS, 1.0f, 1.2f);
+                sendTitle(winner, "§6§lROUND " + roundWon + " WON!", scoreText + " §7(Next round in 4s)");
+            }
+
+            victim.sendMessage(Text.literal("§c§l[PvP Domain] Round " + roundWon + " Lost! " + scoreText), false);
+            victim.playSoundToPlayer(SoundEvents.ENTITY_WITHER_SPAWN, SoundCategory.PLAYERS, 0.8f, 1.0f);
+            sendTitle(victim, "§c§lROUND " + roundWon + " LOST!", scoreText + " §7(Next round in 4s)");
+
+            // Wipe temporary player placed blocks (water, lava, cobwebs, planks)
+            if (arena != null) {
+                ServerWorld world = server.getOverworld();
+                for (BlockPos bpos : match.getPlacedBlocks()) {
+                    world.setBlockState(bpos, Blocks.AIR.getDefaultState(), 3);
+                }
+                match.clearPlacedBlocks();
+            }
+
+            // Reset positions to spawn pedestals and re-lock
+            if (arena != null) {
+                teleportPlayer(victim, server.getOverworld(), arena.getSpawn1World());
+                lockPlayerToSpawn(victim, arena.getSpawn1World());
+                if (winner != null) {
+                    teleportPlayer(winner, server.getOverworld(), arena.getSpawn2World());
+                    lockPlayerToSpawn(winner, arena.getSpawn2World());
+                }
+            }
+
+            // Re-apply the selected kit for the next round
+            applyLoadout(victim, match.getActiveKitName());
+            if (winner != null) {
+                applyLoadout(winner, match.getActiveKitName());
+            }
+
+            // 4 seconds transition delay before countdown of the next round
+            match.setRoundTransitionTicks(80);
         }
+    }
 
-        victim.sendMessage(Text.literal("§c§l[PvP Domain] DEFEAT! §7Better luck next time against " + winnerName + "."), false);
-        victim.playSoundToPlayer(SoundEvents.ENTITY_WITHER_SPAWN, SoundCategory.PLAYERS, 0.8f, 1.0f);
-        sendTitle(victim, "§c§lDEFEAT!", "§7Better luck next time! Domain collapsing in 5s...");
+    /**
+     * Spawns festive fireworks from 8 perimeter directions around the Colosseum.
+     */
+    public static void spawnRoundWinFireworks(MinecraftServer server, ArenaInstance arena) {
+        ServerWorld world = server.getOverworld();
+        for (int i = 0; i < 8; i++) {
+            double angle = i * Math.PI / 4.0;
+            double fx = arena.getOriginX() + Math.cos(angle) * 20.0;
+            double fz = arena.getOriginZ() + Math.sin(angle) * 20.0;
+            double fy = arena.getOriginY() + 4.0;
 
-        broadcastMatchFinished(winner != null ? winner : victim, victim, match);
-
-        match.setFinishCountdownTicks(100); // 5 seconds of post-duel celebration before collapse
+            world.spawnParticles(ParticleTypes.FIREWORK, fx, fy + 8, fz, 30, 0.8, 0.8, 0.8, 0.15);
+            world.playSound(null, BlockPos.ofFloored(fx, fy + 8, fz), SoundEvents.ENTITY_FIREWORK_ROCKET_BLAST, SoundCategory.PLAYERS, 1.2f, 1.0f);
+            world.playSound(null, BlockPos.ofFloored(fx, fy + 8, fz), SoundEvents.ENTITY_FIREWORK_ROCKET_TWINKLE, SoundCategory.PLAYERS, 1.2f, 1.0f);
+        }
     }
 
     private static void sendTitle(ServerPlayerEntity player, String titleText, String subtitleText) {
@@ -358,21 +493,12 @@ public class ServerMatchController {
         lockPlayerToSpawn(p2, sp2);
 
         // Reapply loadouts
-        Party party = PartyManager.getInstance().getPartyById(match.getPartyId());
-        String l1 = "CLASSIC";
-        String l2 = "CLASSIC";
-        if (party != null) {
-            PartyMember m1 = party.getMember(p1.getUuid());
-            PartyMember m2 = party.getMember(p2.getUuid());
-            if (m1 != null && m1.getSelectedLoadoutName() != null) l1 = m1.getSelectedLoadoutName();
-            if (m2 != null && m2.getSelectedLoadoutName() != null) l2 = m2.getSelectedLoadoutName();
-        }
-        applyLoadout(p1, l1);
-        applyLoadout(p2, l2);
+        applyLoadout(p1, match.getActiveKitName());
+        applyLoadout(p2, match.getActiveKitName());
 
         // Transition to COUNTDOWN
         match.getStateMachine().transitionTo(MatchState.COUNTDOWN);
-        match.setCountdownSeconds(ModConfig.get().match.countdownDurationSeconds);
+        match.setCountdownSeconds(3);
 
         p1.sendMessage(Text.literal("§6§l[PvP Domain] Rematch accepted! Starting countdown..."), false);
         p2.sendMessage(Text.literal("§6§l[PvP Domain] Rematch accepted! Starting countdown..."), false);
@@ -389,6 +515,15 @@ public class ServerMatchController {
         CleanupStartedPayload cleanupPayload = new CleanupStartedPayload();
         if (p1 != null) ServerPlayNetworking.send(p1, cleanupPayload);
         if (p2 != null) ServerPlayNetworking.send(p2, cleanupPayload);
+
+        // Wipe temporary player-placed blocks (water, lava, cobwebs, planks)
+        if (arena != null) {
+            ServerWorld world = server.getOverworld();
+            for (BlockPos pos : match.getPlacedBlocks()) {
+                world.setBlockState(pos, Blocks.AIR.getDefaultState(), 3);
+            }
+            match.clearPlacedBlocks();
+        }
 
         // Teardown placed blocks in arena - wipe everything back to air!
         if (arena != null) {
@@ -413,9 +548,15 @@ public class ServerMatchController {
             arena.setStatus(ArenaInstance.Status.RELEASED);
         }
 
-        // Restore player snapshots and teleport them back home
-        if (p1 != null) restorePlayerSnapshot(p1, server);
-        if (p2 != null) restorePlayerSnapshot(p2, server);
+        // Clear all given kit items and restore pre-match inventories & locations
+        if (p1 != null) {
+            p1.getInventory().clear();
+            restorePlayerSnapshot(p1, server);
+        }
+        if (p2 != null) {
+            p2.getInventory().clear();
+            restorePlayerSnapshot(p2, server);
+        }
 
         DomainDestroyedPayload destroyedPayload = new DomainDestroyedPayload();
         if (p1 != null) {
@@ -453,6 +594,17 @@ public class ServerMatchController {
         snapshot.setExperienceProgress(player.experienceProgress);
         snapshot.setGameMode(player.interactionManager.getGameMode().getName());
 
+        // Snapshot full inventory loss-lessly
+        snapshot.getSavedMain().clear();
+        for (ItemStack stack : player.getInventory().main) {
+            snapshot.getSavedMain().add(stack.copy());
+        }
+        snapshot.getSavedArmor().clear();
+        for (ItemStack stack : player.getInventory().armor) {
+            snapshot.getSavedArmor().add(stack.copy());
+        }
+        snapshot.setSavedOffhand(player.getInventory().offHand.get(0).copy());
+
         PlayerStateManager.getInstance().recordSnapshot(snapshot);
         PersistenceManager.getInstance().persistSnapshot(snapshot);
     }
@@ -462,12 +614,16 @@ public class ServerMatchController {
         player.setVelocity(0, 0, 0);
         player.fallDistance = 0.0f;
 
+        // Wipe any kit items currently on the player!
+        player.getInventory().clear();
+
         PlayerSnapshot snapshot = PlayerStateManager.getInstance().releaseSnapshot(player.getUuid());
         PersistenceManager.getInstance().removePersistedSnapshot(player.getUuid());
 
         if (snapshot == null) return;
 
-        ServerWorld targetWorld = server.getOverworld();
+        ServerWorld targetWorld = server.getWorld(RegistryKey.of(RegistryKeys.WORLD, Identifier.tryParse(snapshot.getDimensionId())));
+        if (targetWorld == null) targetWorld = server.getOverworld();
         player.teleport(targetWorld, snapshot.getX(), snapshot.getY(), snapshot.getZ(), snapshot.getYaw(), snapshot.getPitch());
         player.setHealth(Math.min(snapshot.getHealth(), (float) player.getAttributeValue(EntityAttributes.GENERIC_MAX_HEALTH)));
         player.getHungerManager().setFoodLevel(snapshot.getFoodLevel());
@@ -475,6 +631,18 @@ public class ServerMatchController {
         player.setExperienceLevel(snapshot.getExperienceLevel());
         player.experienceProgress = snapshot.getExperienceProgress();
         player.changeGameMode(GameMode.byName(snapshot.getGameMode(), GameMode.SURVIVAL));
+
+        // Restore pre-match inventory items
+        for (int i = 0; i < snapshot.getSavedMain().size() && i < player.getInventory().main.size(); i++) {
+            player.getInventory().main.set(i, snapshot.getSavedMain().get(i).copy());
+        }
+        for (int i = 0; i < snapshot.getSavedArmor().size() && i < player.getInventory().armor.size(); i++) {
+            player.getInventory().armor.set(i, snapshot.getSavedArmor().get(i).copy());
+        }
+        if (snapshot.getSavedOffhand() != null && !snapshot.getSavedOffhand().isEmpty()) {
+            player.getInventory().offHand.set(0, snapshot.getSavedOffhand().copy());
+        }
+        player.playerScreenHandler.sendContentUpdates();
     }
 
     private static void teleportPlayer(ServerPlayerEntity player, ServerWorld world, ArenaSpawnPoint sp) {
@@ -506,7 +674,9 @@ public class ServerMatchController {
         );
         if (clamped.outside()) {
             player.teleport(player.getServerWorld(), clamped.x(), clamped.y(), clamped.z(), player.getYaw(), player.getPitch());
-            player.setVelocity(0, 0, 0);
+            // Downward velocity to stop any wall climbing or jumping over the rim
+            player.setVelocity(0, -0.6, 0);
+            player.sendMessage(Text.literal("§c[!] Arena Boundary: You cannot escape the Colosseum!"), true);
         }
     }
 
@@ -547,6 +717,12 @@ public class ServerMatchController {
         if (id == null) return ItemStack.EMPTY;
         Item mcItem = Registries.ITEM.get(id);
         if (mcItem == null) return ItemStack.EMPTY;
+
+        // Custom Splash Potion of Healing II creation
+        if (id.getPath().equals("splash_potion")) {
+            return PotionContentsComponent.createStack(Items.SPLASH_POTION, Potions.STRONG_HEALING);
+        }
+
         return new ItemStack(mcItem, item.count());
     }
 

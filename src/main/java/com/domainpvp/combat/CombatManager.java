@@ -70,11 +70,30 @@ public class CombatManager {
     }
 
     /**
-     * Determines whether a player is authorized to place blocks.
+     * Determines whether a player is authorized to place blocks or fluids.
+     * During duels, placement is allowed inside the combat zone (for cobwebs, planks, water)
+     * but strictly disallowed on outer upper walls to prevent escape.
      */
     public boolean canPlaceBlock(UUID playerUuid) {
         MatchSession match = MatchManager.getInstance().getMatchByPlayer(playerUuid);
-        return match == null;
+        if (match == null) return true;
+        return match.getState() == MatchState.FIGHTING;
+    }
+
+    public boolean canPlaceBlockAt(UUID playerUuid, ArenaInstance arena, int x, int y, int z) {
+        MatchSession match = MatchManager.getInstance().getMatchByPlayer(playerUuid);
+        if (match == null) return true;
+        if (match.getState() != MatchState.FIGHTING) return false;
+        if (arena == null) return false;
+
+        // Disallow placing blocks or fluids near the top rim or outside the arena
+        double dx = x - arena.getOriginX();
+        double dz = z - arena.getOriginZ();
+        double dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist > arena.getTemplate().getBoundaryRadius() - 2.0) return false;
+        if (y >= arena.getOriginY() + 8) return false;
+
+        return true;
     }
 
     /**
@@ -90,7 +109,7 @@ public class CombatManager {
     }
 
     /**
-     * Calculates repositioning vector if a player tries to breach arena perimeter.
+     * Calculates repositioning vector if a player tries to breach arena perimeter or wall ceiling.
      */
     public record ClampedPosition(boolean outside, double x, double y, double z) {}
 
@@ -104,15 +123,28 @@ public class CombatManager {
         double dx = x - originCenterX;
         double dz = z - originCenterZ;
         double dist = Math.sqrt(dx * dx + dz * dz);
-        double maxRadius = arena.getTemplate().getBoundaryRadius() - 0.5;
+        double maxRadius = arena.getTemplate().getBoundaryRadius() - 1.0;
+        double maxY = arena.getOriginY() + arena.getTemplate().getBoundaryHeight() - 1.0;
 
+        boolean outside = false;
+        double clampedX = x;
+        double clampedZ = z;
+        double clampedY = y;
+
+        // Radial perimeter clamping
         if (dist > maxRadius && dist > 0.001) {
-            double clampedX = originCenterX + (dx / dist) * maxRadius;
-            double clampedZ = originCenterZ + (dz / dist) * maxRadius;
-            return new ClampedPosition(true, clampedX, y, clampedZ);
+            clampedX = originCenterX + (dx / dist) * maxRadius;
+            clampedZ = originCenterZ + (dz / dist) * maxRadius;
+            outside = true;
         }
 
-        return new ClampedPosition(false, x, y, z);
+        // Vertical height ceiling clamping (prevents water-climbing, tower-jumping, pearl breaches)
+        if (y > maxY) {
+            clampedY = maxY - 1.5;
+            outside = true;
+        }
+
+        return new ClampedPosition(outside, clampedX, clampedY, clampedZ);
     }
 }
 

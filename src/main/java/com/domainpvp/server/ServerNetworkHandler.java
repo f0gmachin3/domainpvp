@@ -122,6 +122,23 @@ public class ServerNetworkHandler {
                     if (party != null) {
                         syncPartyState(context.server(), party);
                     }
+
+                    // Also record vote if inside an active duel match
+                    MatchSession match = MatchManager.getInstance().getMatchByPlayer(player.getUuid());
+                    if (match != null) {
+                        match.voteKit(player.getUuid(), loadout.getName());
+                        player.sendMessage(Text.literal("§a[PvP Domain] You voted for §6" + loadout.getName() + "§a!"), false);
+
+                        UUID oppUuid = match.getOpponent(player.getUuid());
+                        ServerPlayerEntity opp = context.server().getPlayerManager().getPlayer(oppUuid);
+                        if (opp != null) {
+                            opp.sendMessage(Text.literal("§7[PvP Domain] " + player.getName().getString() + " voted for §6" + loadout.getName() + "§7."), false);
+                        }
+
+                        if (match.haveBothVotedKit()) {
+                            ServerMatchController.resolveAndApplyKit(context.server(), match);
+                        }
+                    }
                 }
             });
         });

@@ -131,19 +131,19 @@ public class StandaloneTestRunner {
         }
 
         // Banned item test
-        Loadout hacked = LoadoutPreset.createDefault(LoadoutPreset.CLASSIC);
+        Loadout hacked = LoadoutPreset.createDefault(LoadoutPreset.SWORD_PVP);
         hacked.setHotbarSlot(0, LoadoutItem.simple("minecraft:bedrock", 1));
         LoadoutManager.ValidationResult banRes = lm.validate(hacked);
         assertTrue("Banned item (bedrock) rejected", !banRes.valid() && banRes.message().contains("Banned item"));
 
         // Illegal enchantment test
-        Loadout overEnchanted = LoadoutPreset.createDefault(LoadoutPreset.CLASSIC);
+        Loadout overEnchanted = LoadoutPreset.createDefault(LoadoutPreset.SWORD_PVP);
         overEnchanted.setHotbarSlot(0, LoadoutItem.enchanted("minecraft:diamond_sword", 1, "minecraft:sharpness", 255));
         LoadoutManager.ValidationResult enchRes = lm.validate(overEnchanted);
         assertTrue("Illegal sharpness 255 rejected", !enchRes.valid() && enchRes.message().contains("Illegal enchantment level"));
 
         // Armor stack test
-        Loadout stackedArmor = LoadoutPreset.createDefault(LoadoutPreset.CLASSIC);
+        Loadout stackedArmor = LoadoutPreset.createDefault(LoadoutPreset.SWORD_PVP);
         stackedArmor.setHelmet(LoadoutItem.simple("minecraft:diamond_helmet", 16));
         LoadoutManager.ValidationResult armorRes = lm.validate(stackedArmor);
         assertTrue("Armor stack > 1 rejected", !armorRes.valid() && armorRes.message().contains("Armor stack size"));

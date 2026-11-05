@@ -55,6 +55,26 @@ public class DomainPvPMod implements ModInitializer {
             return CombatManager.getInstance().canBreakBlock(player.getUuid());
         });
 
+        // Enforce arena block & fluid placement restrictions to prevent escape and track placed blocks
+        net.fabricmc.fabric.api.event.player.UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
+            if (!world.isClient() && player instanceof ServerPlayerEntity serverPlayer) {
+                com.domainpvp.match.MatchSession match = com.domainpvp.match.MatchManager.getInstance().getMatchByPlayer(player.getUuid());
+                if (match != null) {
+                    if (match.getState() != com.domainpvp.match.MatchState.FIGHTING) {
+                        return net.minecraft.util.ActionResult.FAIL;
+                    }
+                    com.domainpvp.arena.ArenaInstance arena = com.domainpvp.arena.ArenaManager.getInstance().getArena(match.getArenaInstanceId());
+                    net.minecraft.util.math.BlockPos placePos = hitResult.getBlockPos().offset(hitResult.getSide());
+                    if (!CombatManager.getInstance().canPlaceBlockAt(player.getUuid(), arena, placePos.getX(), placePos.getY(), placePos.getZ())) {
+                        serverPlayer.sendMessage(net.minecraft.text.Text.literal("§c[!] Cannot place blocks or water here!"), true);
+                        return net.minecraft.util.ActionResult.FAIL;
+                    }
+                    match.addPlacedBlock(placePos);
+                }
+            }
+            return net.minecraft.util.ActionResult.PASS;
+        });
+
         // Initialize server handlers and commands for both dedicated & integrated servers
         com.domainpvp.server.DomainPvPServerMod.initializeServerCommon();
 

@@ -1,12 +1,13 @@
 package com.domainpvp.match;
 
+import net.minecraft.util.math.BlockPos;
+
 import java.time.Instant;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Authoritative session holding state for an individual 1v1 duel.
+ * Authoritative session holding state for an individual Best of 3 (Bo3) duel.
  */
 public class MatchSession {
     private final UUID matchId;
@@ -19,7 +20,21 @@ public class MatchSession {
     private final MatchStats stats;
     private final Map<UUID, Boolean> rematchVotes = new ConcurrentHashMap<>();
 
-    private int countdownSeconds = 5;
+    // Best of 3 (Bo3) Tracking
+    private int currentRound = 1;
+    private int player1Score = 0;
+    private int player2Score = 0;
+    private int roundTransitionTicks = -1; // -1 when round is active, >=0 during delay between rounds
+
+    // Kit Selection & Voting
+    private String activeKitName = "SWORD_PVP";
+    private final Map<UUID, String> kitVotes = new ConcurrentHashMap<>();
+    private int kitVotingTicks = 160; // 8s countdown while manifested
+
+    // Arena cleanup for player-placed blocks (water, lava, cobweb, planks)
+    private final List<BlockPos> placedBlocks = Collections.synchronizedList(new ArrayList<>());
+
+    private int countdownSeconds = 3;
     private int finishCountdownTicks = 100; // 5 seconds post-match celebration
     private Instant startTime;
     private Instant finishTime;
@@ -79,6 +94,124 @@ public class MatchSession {
         return null;
     }
 
+    // Best of 3 Mechanics
+    public int getCurrentRound() {
+        return currentRound;
+    }
+
+    public int getPlayer1Score() {
+        return player1Score;
+    }
+
+    public int getPlayer2Score() {
+        return player2Score;
+    }
+
+    public void recordRoundWin(UUID winnerUuid) {
+        if (player1Uuid.equals(winnerUuid)) {
+            player1Score++;
+        } else if (player2Uuid.equals(winnerUuid)) {
+            player2Score++;
+        }
+    }
+
+    public boolean isMatchDecided() {
+        return player1Score >= 2 || player2Score >= 2;
+    }
+
+    public UUID getMatchWinner() {
+        if (player1Score >= 2) return player1Uuid;
+        if (player2Score >= 2) return player2Uuid;
+        return null;
+    }
+
+    public void nextRound() {
+        currentRound++;
+    }
+
+    public int getRoundTransitionTicks() {
+        return roundTransitionTicks;
+    }
+
+    public void setRoundTransitionTicks(int ticks) {
+        this.roundTransitionTicks = ticks;
+    }
+
+    public int decrementRoundTransitionTicks() {
+        return --roundTransitionTicks;
+    }
+
+    // Kit Voting
+    public void voteKit(UUID player, String kit) {
+        if (containsPlayer(player) && kit != null) {
+            kitVotes.put(player, kit);
+        }
+    }
+
+    public String getKitVote(UUID player) {
+        return kitVotes.get(player);
+    }
+
+    public boolean haveBothVotedKit() {
+        return kitVotes.containsKey(player1Uuid) && kitVotes.containsKey(player2Uuid);
+    }
+
+    public String resolveKit() {
+        String v1 = kitVotes.get(player1Uuid);
+        String v2 = kitVotes.get(player2Uuid);
+
+        if (v1 != null && v2 != null) {
+            if (v1.equalsIgnoreCase(v2)) {
+                return v1;
+            } else {
+                // If votes differ, randomly pick one of the two voted kits
+                return new Random().nextBoolean() ? v1 : v2;
+            }
+        } else if (v1 != null) {
+            return v1;
+        } else if (v2 != null) {
+            return v2;
+        } else {
+            return "SWORD_PVP";
+        }
+    }
+
+    public String getActiveKitName() {
+        return activeKitName;
+    }
+
+    public void setActiveKitName(String activeKitName) {
+        this.activeKitName = activeKitName;
+    }
+
+    public int getKitVotingTicks() {
+        return kitVotingTicks;
+    }
+
+    public void setKitVotingTicks(int kitVotingTicks) {
+        this.kitVotingTicks = kitVotingTicks;
+    }
+
+    public int decrementKitVotingTicks() {
+        return --kitVotingTicks;
+    }
+
+    // Player-placed blocks tracking
+    public List<BlockPos> getPlacedBlocks() {
+        return placedBlocks;
+    }
+
+    public void addPlacedBlock(BlockPos pos) {
+        if (!placedBlocks.contains(pos)) {
+            placedBlocks.add(pos);
+        }
+    }
+
+    public void clearPlacedBlocks() {
+        placedBlocks.clear();
+    }
+
+    // Countdown and lifecycle
     public int getCountdownSeconds() {
         return countdownSeconds;
     }

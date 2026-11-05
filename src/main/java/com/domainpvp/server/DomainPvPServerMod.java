@@ -50,6 +50,7 @@ public class DomainPvPServerMod implements DedicatedServerModInitializer {
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             File saveDir = server.getSavePath(net.minecraft.util.WorldSavePath.ROOT).toFile();
             PersistenceManager.getInstance().initialize(saveDir);
+            ServerMatchController.initializeHealthScoreboard(server);
             System.out.println("[PvP Domain] Server started and persistence storage initialized.");
         });
 
@@ -61,7 +62,7 @@ public class DomainPvPServerMod implements DedicatedServerModInitializer {
 
     private static void registerCommands() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-            // Direct shortcuts: /start, /ready, /unready, /accept
+            // Direct shortcuts: /start, /ready, /unready, /accept, /kit
             dispatcher.register(CommandManager.literal("start")
                     .executes(ctx -> executeStart(ctx.getSource().getPlayer(), ctx.getSource().getServer())));
 
@@ -73,6 +74,14 @@ public class DomainPvPServerMod implements DedicatedServerModInitializer {
 
             dispatcher.register(CommandManager.literal("accept")
                     .executes(ctx -> executeAccept(ctx.getSource().getPlayer(), ctx.getSource().getServer())));
+
+            dispatcher.register(CommandManager.literal("kit")
+                    .then(CommandManager.argument("name", StringArgumentType.word())
+                            .executes(ctx -> executeKitVote(
+                                    ctx.getSource().getPlayer(),
+                                    StringArgumentType.getString(ctx, "name"),
+                                    ctx.getSource().getServer()
+                            ))));
 
             // Register /domain and /party command trees
             for (String baseName : List.of("domain", "party")) {
@@ -262,5 +271,34 @@ public class DomainPvPServerMod implements DedicatedServerModInitializer {
             player.sendMessage(Text.literal("§c[PvP Domain] Could not send invite. Are you the party leader? Is party full?"), false);
             return 0;
         }
+    }
+
+    public static int executeKitVote(ServerPlayerEntity player, String kitName, MinecraftServer server) {
+        if (player == null) return 0;
+        com.domainpvp.match.MatchSession match = com.domainpvp.match.MatchManager.getInstance().getMatchByPlayer(player.getUuid());
+        if (match == null) {
+            player.sendMessage(Text.literal("§c[PvP Domain] You are not currently in a duel session!"), false);
+            return 0;
+        }
+
+        com.domainpvp.loadout.Loadout preset = com.domainpvp.loadout.LoadoutManager.getInstance().getPreset(kitName);
+        if (preset == null) {
+            player.sendMessage(Text.literal("§c[PvP Domain] Unknown kit! Available: SWORD, AXE, UHC, SMP, MACE, POT (or numbers 1-6)"), false);
+            return 0;
+        }
+
+        match.voteKit(player.getUuid(), preset.getName());
+        player.sendMessage(Text.literal("§a[PvP Domain] You voted for §6" + preset.getName() + "§a!"), false);
+
+        UUID oppUuid = match.getOpponent(player.getUuid());
+        ServerPlayerEntity opp = server.getPlayerManager().getPlayer(oppUuid);
+        if (opp != null) {
+            opp.sendMessage(Text.literal("§7[PvP Domain] " + player.getName().getString() + " voted for §6" + preset.getName() + "§7."), false);
+        }
+
+        if (match.haveBothVotedKit()) {
+            ServerMatchController.resolveAndApplyKit(server, match);
+        }
+        return 1;
     }
 }

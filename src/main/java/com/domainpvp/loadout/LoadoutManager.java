@@ -75,10 +75,18 @@ public class LoadoutManager {
 
     public Loadout getPreset(String name) {
         if (name == null) {
-            return registeredPresets.get("CLASSIC");
+            return registeredPresets.get("SWORD_PVP");
         }
-        Loadout preset = registeredPresets.get(name.toUpperCase(Locale.ROOT));
-        return preset != null ? preset : registeredPresets.get("CLASSIC");
+        String clean = name.trim().toUpperCase(Locale.ROOT);
+        if (clean.equals("1") || clean.equals("SWORD") || clean.equals("CLASSIC")) clean = "SWORD_PVP";
+        else if (clean.equals("2") || clean.equals("AXE")) clean = "AXE_PVP";
+        else if (clean.equals("3") || clean.equals("UHC")) clean = "UHC_PVP";
+        else if (clean.equals("4") || clean.equals("SMP") || clean.equals("NETHERITE")) clean = "SMP_PVP";
+        else if (clean.equals("5") || clean.equals("MACE")) clean = "MACE_PVP";
+        else if (clean.equals("6") || clean.equals("POT") || clean.equals("POTION")) clean = "POT_PVP";
+
+        Loadout preset = registeredPresets.get(clean);
+        return preset != null ? preset : registeredPresets.get("SWORD_PVP");
     }
 
     public record ValidationResult(boolean valid, String message) {

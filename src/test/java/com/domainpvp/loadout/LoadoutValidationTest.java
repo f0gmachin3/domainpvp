@@ -21,7 +21,7 @@ public class LoadoutValidationTest {
     @Test
     public void testBannedItemRejection() {
         LoadoutManager manager = LoadoutManager.getInstance();
-        Loadout loadout = LoadoutPreset.createDefault(LoadoutPreset.CLASSIC);
+        Loadout loadout = LoadoutPreset.createDefault(LoadoutPreset.SWORD_PVP);
 
         // Inject bedrock into hotbar slot 0
         loadout.setHotbarSlot(0, LoadoutItem.simple("minecraft:bedrock", 1));
@@ -34,7 +34,7 @@ public class LoadoutValidationTest {
     @Test
     public void testIllegalEnchantmentLevelRejection() {
         LoadoutManager manager = LoadoutManager.getInstance();
-        Loadout loadout = LoadoutPreset.createDefault(LoadoutPreset.CLASSIC);
+        Loadout loadout = LoadoutPreset.createDefault(LoadoutPreset.SWORD_PVP);
 
         // Inject illegal Sharpness 255
         loadout.setHotbarSlot(0, LoadoutItem.enchanted("minecraft:diamond_sword", 1, "minecraft:sharpness", 255));
@@ -47,7 +47,7 @@ public class LoadoutValidationTest {
     @Test
     public void testArmorStackSizeMustBeOne() {
         LoadoutManager manager = LoadoutManager.getInstance();
-        Loadout loadout = LoadoutPreset.createDefault(LoadoutPreset.CLASSIC);
+        Loadout loadout = LoadoutPreset.createDefault(LoadoutPreset.SWORD_PVP);
 
         // Set helmet stack to 5
         loadout.setHelmet(LoadoutItem.simple("minecraft:diamond_helmet", 5));

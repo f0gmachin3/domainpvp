@@ -30,6 +30,7 @@ public class NetworkingManager {
         PayloadTypeRegistry.playS2C().register(ArenaConstructionStartedPayload.ID, ArenaConstructionStartedPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(ArenaConstructionProgressPayload.ID, ArenaConstructionProgressPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(ArenaConstructionCompletedPayload.ID, ArenaConstructionCompletedPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(OpenKitSelectionPayload.ID, OpenKitSelectionPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(CountdownUpdatedPayload.ID, CountdownUpdatedPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(MatchStartedPayload.ID, MatchStartedPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(MatchFinishedPayload.ID, MatchFinishedPayload.CODEC);

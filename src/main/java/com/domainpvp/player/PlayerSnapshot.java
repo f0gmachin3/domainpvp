@@ -182,5 +182,26 @@ public class PlayerSnapshot {
     public List<PotionEffectSnapshot> getEffects() {
         return effects;
     }
+
+    // Exact in-memory ItemStack copies for lossless pre-match snapshotting
+    private transient final List<net.minecraft.item.ItemStack> savedMain = new ArrayList<>();
+    private transient final List<net.minecraft.item.ItemStack> savedArmor = new ArrayList<>();
+    private transient net.minecraft.item.ItemStack savedOffhand = null;
+
+    public List<net.minecraft.item.ItemStack> getSavedMain() {
+        return savedMain;
+    }
+
+    public List<net.minecraft.item.ItemStack> getSavedArmor() {
+        return savedArmor;
+    }
+
+    public net.minecraft.item.ItemStack getSavedOffhand() {
+        return savedOffhand;
+    }
+
+    public void setSavedOffhand(net.minecraft.item.ItemStack savedOffhand) {
+        this.savedOffhand = savedOffhand;
+    }
 }
 
